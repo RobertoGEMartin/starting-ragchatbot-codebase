@@ -34,6 +34,11 @@ Create a `.env` file in the root directory:
 ANTHROPIC_API_KEY=your_api_key_here
 ```
 
+## Commit Guidelines
+
+When creating commits, use simple commit messages without attribution footers or emoji.
+Do not add "Generated with Claude Code" or "Co-Authored-By" text.
+
 ## Architecture
 
 ### Core RAG Pipeline Flow
