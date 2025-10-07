@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG System Architecture</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #e0e0e0;
+        }
+
+        #container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        h1 {
+            text-align: center;
+            color: #61dafb;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node circle {
+            stroke-width: 2px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .node:hover circle {
+            stroke-width: 4px;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+        }
+
+        .node text {
+            font-size: 12px;
+            font-weight: 600;
+            pointer-events: none;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .link {
+            stroke: #666;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+            fill: none;
+        }
+
+        .link-label {
+            font-size: 10px;
+            fill: #aaa;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid #61dafb;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 13px;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .tooltip h3 {
+            margin: 0 0 8px 0;
+            color: #61dafb;
+            font-size: 15px;
+        }
+
+        .tooltip .file {
+            color: #98c379;
+            font-family: monospace;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
+        .tooltip .description {
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+
+        .legend {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(30, 30, 30, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .legend h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #61dafb;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid #444;
+        }
+
+        .controls {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .controls button {
+            background: #61dafb;
+            color: #1e1e1e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+
+        .controls button:hover {
+            background: #4fa8c5;
+        }
+    </style>
+</head>
+<body>
+    <h1>RAG System Architecture</h1>
+    <div class="subtitle">Interactive System Diagram - Hover for details, Click to highlight connections</div>
+
+    <div class="legend">
+        <h3>Component Types</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #61dafb;"></div>
+            <span>API Layer</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e06c75;"></div>
+            <span>Core Orchestrator</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #98c379;"></div>
+            <span>Data Storage</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #d19a66;"></div>
+            <span>Processing</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #c678dd;"></div>
+            <span>AI Generation</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #56b6c2;"></div>
+            <span>Tools</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e5c07b;"></div>
+            <span>Session</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #abb2bf;"></div>
+            <span>External</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="resetView()">Reset View</button>
+        <button onclick="centerGraph()">Center Graph</button>
+    </div>
+
+    <div id="container"></div>
+
+    <script>
+        // Data structure
+        const nodes = [
+            // API Layer
+            { id: 'fastapi', label: 'FastAPI', type: 'api', file: 'backend/app.py',
+              description: 'Web server handling HTTP requests, CORS, and serving static files. Initializes RAG system on startup.',
+              size: 40, color: '#61dafb' },
+            { id: 'frontend', label: 'Frontend', type: 'api', file: 'frontend/',
+              description: 'HTML/JS/CSS interface for user interaction. Maintains session state and displays responses.',
+              size: 30, color: '#61dafb' },
+
+            // Core
+            { id: 'rag', label: 'RAGSystem', type: 'core', file: 'backend/rag_system.py',
+              description: 'Main orchestrator coordinating all components. Manages document ingestion and query processing with tool-based search.',
+              size: 45, color: '#e06c75' },
+
+            // Storage
+            { id: 'vectorstore', label: 'VectorStore', type: 'storage', file: 'backend/vector_store.py',
+              description: 'Manages two ChromaDB collections: course_catalog (metadata) and course_content (chunks). Implements semantic search with filtering.',
+              size: 38, color: '#98c379' },
+            { id: 'chromadb', label: 'ChromaDB', type: 'external', file: 'External Database',
+              description: 'Persistent vector database storing embeddings. Uses sentence-transformers for embedding generation.',
+              size: 30, color: '#abb2bf' },
+
+            // Processing
+            { id: 'docprocessor', label: 'DocumentProcessor', type: 'processing', file: 'backend/document_processor.py',
+              description: 'Parses course documents, extracts metadata, and creates sentence-based chunks with overlap. Adds lesson context to chunks.',
+              size: 32, color: '#d19a66' },
+
+            // AI
+            { id: 'aigenerator', label: 'AIGenerator', type: 'ai', file: 'backend/ai_generator.py',
+              description: 'Handles Claude API interactions with tool calling. Implements agentic tool execution loop for multi-turn reasoning.',
+              size: 38, color: '#c678dd' },
+            { id: 'claude', label: 'Claude API', type: 'external', file: 'Anthropic API',
+              description: 'Claude Sonnet 4 model for natural language understanding and generation with tool use capabilities.',
+              size: 30, color: '#abb2bf' },
+
+            // Tools
+            { id: 'toolmanager', label: 'ToolManager', type: 'tools', file: 'backend/search_tools.py',
+              description: 'Manages available tools for AI. Registers tools and handles execution with parameter routing.',
+              size: 28, color: '#56b6c2' },
+            { id: 'searchtool', label: 'CourseSearchTool', type: 'tools', file: 'backend/search_tools.py',
+              description: 'Semantic search tool with course name matching and lesson filtering. Tracks sources for UI display.',
+              size: 32, color: '#56b6c2' },
+
+            // Session
+            { id: 'session', label: 'SessionManager', type: 'session', file: 'backend/session_manager.py',
+              description: 'Manages conversation history per session. Maintains configurable message history for context.',
+              size: 28, color: '#e5c07b' },
+
+            // Collections (sub-nodes)
+            { id: 'catalog', label: 'course_catalog', type: 'storage', file: 'ChromaDB Collection',
+              description: 'Stores course metadata for semantic course name matching. Enables fuzzy course title search.',
+              size: 22, color: '#98c379' },
+            { id: 'content', label: 'course_content', type: 'storage', file: 'ChromaDB Collection',
+              description: 'Stores chunked course material with lesson-level granularity. Optimized for content retrieval.',
+              size: 22, color: '#98c379' }
+        ];
+
+        const links = [
+            // API Layer connections
+            { source: 'frontend', target: 'fastapi', label: 'HTTP/REST' },
+            { source: 'fastapi', target: 'rag', label: 'query()' },
+
+            // RAG orchestration
+            { source: 'rag', target: 'docprocessor', label: 'process_course_document()' },
+            { source: 'rag', target: 'vectorstore', label: 'add/search' },
+            { source: 'rag', target: 'aigenerator', label: 'generate_response()' },
+            { source: 'rag', target: 'session', label: 'get/add history' },
+            { source: 'rag', target: 'toolmanager', label: 'get_tool_definitions()' },
+
+            // Document processing flow
+            { source: 'docprocessor', target: 'vectorstore', label: 'chunks' },
+
+            // Vector store
+            { source: 'vectorstore', target: 'chromadb', label: 'persist' },
+            { source: 'vectorstore', target: 'catalog', label: 'manages' },
+            { source: 'vectorstore', target: 'content', label: 'manages' },
+            { source: 'catalog', target: 'chromadb', label: 'stored in' },
+            { source: 'content', target: 'chromadb', label: 'stored in' },
+
+            // AI generation
+            { source: 'aigenerator', target: 'claude', label: 'API calls' },
+            { source: 'aigenerator', target: 'toolmanager', label: 'execute_tool()' },
+
+            // Tool system
+            { source: 'toolmanager', target: 'searchtool', label: 'registers' },
+            { source: 'searchtool', target: 'vectorstore', label: 'search()' }
+        ];
+
+        // Set up SVG
+        const width = window.innerWidth - 40;
+        const height = window.innerHeight - 120;
+
+        const svg = d3.select('#container')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Add zoom behavior
+        const g = svg.append('g');
+
+        const zoom = d3.zoom()
+            .scaleExtent([0.3, 3])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+
+        svg.call(zoom);
+
+        // Create tooltip
+        const tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0);
+
+        // Create force simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(links).id(d => d.id).distance(150))
+            .force('charge', d3.forceManyBody().strength(-800))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(d => d.size + 10));
+
+        // Create links
+        const link = g.append('g')
+            .selectAll('path')
+            .data(links)
+            .join('path')
+            .attr('class', 'link')
+            .attr('stroke', '#666')
+            .attr('marker-end', 'url(#arrowhead)');
+
+        // Create link labels
+        const linkLabel = g.append('g')
+            .selectAll('text')
+            .data(links)
+            .join('text')
+            .attr('class', 'link-label')
+            .text(d => d.label);
+
+        // Create arrow marker
+        svg.append('defs').append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '-0 -5 10 10')
+            .attr('refX', 23)
+            .attr('refY', 0)
+            .attr('orient', 'auto')
+            .attr('markerWidth', 8)
+            .attr('markerHeight', 8)
+            .append('svg:path')
+            .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+            .attr('fill', '#666');
+
+        // Create nodes
+        const node = g.append('g')
+            .selectAll('g')
+            .data(nodes)
+            .join('g')
+            .attr('class', 'node')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        node.append('circle')
+            .attr('r', d => d.size)
+            .attr('fill', d => d.color)
+            .attr('stroke', '#2c2c2c');
+
+        node.append('text')
+            .attr('dy', d => d.size + 15)
+            .attr('text-anchor', 'middle')
+            .attr('fill', '#e0e0e0')
+            .text(d => d.label);
+
+        // Hover interactions
+        node.on('mouseover', function(event, d) {
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 1);
+            tooltip.html(`
+                <h3>${d.label}</h3>
+                <div class="file">${d.file}</div>
+                <div class="description">${d.description}</div>
+            `)
+                .style('left', (event.pageX + 15) + 'px')
+                .style('top', (event.pageY - 15) + 'px');
+
+            d3.select(this).select('circle')
+                .transition()
+                .duration(200)
+                .attr('r', d.size * 1.2);
+        })
+        .on('mouseout', function(event, d) {
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 0);
+
+            d3.select(this).select('circle')
+                .transition()
+                .duration(200)
+                .attr('r', d.size);
+        });
+
+        // Click to highlight connections
+        let selectedNode = null;
+        node.on('click', function(event, d) {
+            event.stopPropagation();
+
+            if (selectedNode === d) {
+                // Deselect
+                selectedNode = null;
+                link.attr('stroke', '#666').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+                node.select('circle').attr('stroke', '#2c2c2c').attr('stroke-width', 2);
+            } else {
+                // Select
+                selectedNode = d;
+
+                // Highlight connected links
+                link.attr('stroke', l => {
+                    return (l.source.id === d.id || l.target.id === d.id) ? '#61dafb' : '#333';
+                })
+                .attr('stroke-opacity', l => {
+                    return (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.2;
+                })
+                .attr('stroke-width', l => {
+                    return (l.source.id === d.id || l.target.id === d.id) ? 3 : 1;
+                });
+
+                // Highlight connected nodes
+                const connectedIds = new Set();
+                connectedIds.add(d.id);
+                links.forEach(l => {
+                    if (l.source.id === d.id) connectedIds.add(l.target.id);
+                    if (l.target.id === d.id) connectedIds.add(l.source.id);
+                });
+
+                node.select('circle')
+                    .attr('stroke', n => connectedIds.has(n.id) ? '#61dafb' : '#2c2c2c')
+                    .attr('stroke-width', n => connectedIds.has(n.id) ? 4 : 2);
+            }
+        });
+
+        svg.on('click', () => {
+            selectedNode = null;
+            link.attr('stroke', '#666').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+            node.select('circle').attr('stroke', '#2c2c2c').attr('stroke-width', 2);
+        });
+
+        // Update positions on simulation tick
+        simulation.on('tick', () => {
+            link.attr('d', d => {
+                const dx = d.target.x - d.source.x;
+                const dy = d.target.y - d.source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy);
+                return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            });
+
+            linkLabel
+                .attr('x', d => (d.source.x + d.target.x) / 2)
+                .attr('y', d => (d.source.y + d.target.y) / 2);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Control functions
+        function resetView() {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+            selectedNode = null;
+            link.attr('stroke', '#666').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+            node.select('circle').attr('stroke', '#2c2c2c').attr('stroke-width', 2);
+        }
+
+        function centerGraph() {
+            const bounds = g.node().getBBox();
+            const fullWidth = bounds.width;
+            const fullHeight = bounds.height;
+            const midX = bounds.x + fullWidth / 2;
+            const midY = bounds.y + fullHeight / 2;
+
+            const scale = 0.8 / Math.max(fullWidth / width, fullHeight / height);
+            const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
+        }
+
+        // Initial center
+        setTimeout(centerGraph, 1000);
+    </script>
+</body>
+</html>
